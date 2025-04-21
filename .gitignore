@@ -1,0 +1,27 @@
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Intellij
+.idea/
+*.iml
+*.iws
+
+# Mac
+.DS_Store
+
+# VSCode
+.vscode
+
+# Maven
+log/
+target/
+effective-pom.xml
+
+#local db
+db.mv.db
+.qodo
+.java-version
+
+akka-context/

@@ -1,1 +1,54 @@
 # real-estate-cs-agent
+
+
+To understand the Akka concepts that are the basis for this example, see [Development Process](https://doc.akka.io/concepts/development-process.html) in the documentation.
+
+
+This project contains the skeleton to create an Akka service. To understand more about these components, see [Developing services](https://doc.akka.io/java/index.html). Examples can be found [here](https://doc.akka.io/java/samples.html).
+
+
+Use Maven to build your project:
+
+```shell
+mvn compile
+```
+
+
+When running an Akka service locally.
+
+To start your service locally, run:
+
+```shell
+mvn compile exec:java
+```
+
+This command will start your Akka service. With your Akka service running, the endpoint it's available at:
+
+```shell
+curl http://localhost:9000/hello
+```
+
+
+You can use the [Akka Console](https://console.akka.io) to create a project and see the status of your service.
+
+Build container image:
+
+```shell
+mvn clean install -DskipTests
+```
+
+Install the `akka` CLI as documented in [Install Akka CLI](https://doc.akka.io/reference/cli/index.html).
+
+Deploy the service using the image tag from above `mvn install`:
+
+```shell
+akka service deploy akka-rag-example akka-rag-example:tag-name --push
+```
+
+Refer to [Deploy and manage services](https://doc.akka.io/operations/services/deploy-service.html)
+for more information.
+
+```shell
+curl -i -XPOST --location "http://localhost:9000/emails" --header "Content-Type: application/json" --data '{"sender": "eduardo@pinto.com", "subject":"Looking to rent T2 in Porto", "content": "Hello, I am looking to rent a T2 in Porto. Can you help me?"}'
+```
+
