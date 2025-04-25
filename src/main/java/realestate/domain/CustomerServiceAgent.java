@@ -56,7 +56,7 @@ public class CustomerServiceAgent {
             Unless the customer says otherwise, you should assume the email address they are using (in the 'From' field) is their valid contact email.
             Only send an email to the customer if you cannot derive the information from their emails.
             If sending an email, ask ONLY for the missing information. Do NOT ask for anything already provided.
-            If the last step was sending an email, don't do anything and just wait for costumer to reply.
+            If the last step was sending an email, don't do anything and just wait for customer to reply.
             When you have all the information, use the tools provided to save the customer information.
             Reply only with: WAIT_REPLY or ALL_INFO_COLLECTED
             </instructions>
