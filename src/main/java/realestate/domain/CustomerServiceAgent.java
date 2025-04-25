@@ -17,6 +17,7 @@ import realestate.application.ClientInfoEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import realestate.application.EmailClient;
+import realestate.application.ProspectProcessingWorkflow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,10 +89,16 @@ public class CustomerServiceAgent {
             logger.info("Saving customer information: name={}, email={}, phone={}, location={}, propertyType={}, transactionType={}",
                 name, email, phoneNumber, location, propertyType, transactionType);
 
-            // Save basic information to ClientInfoEntity
+            // Save information to ClientInfoEntity
             componentClient.forEventSourcedEntity(email)
                 .method(ClientInfoEntity::saveClientInfo)
-                .invoke(new ClientInfoEntity.SaveInfoCmd(name, email, phoneNumber));
+                .invoke(
+                    new ClientInfoEntity.SaveInfoCmd(
+                        name,
+                        email,
+                        phoneNumber,
+                        ClientInfoEntity.PropertyDetails.of(location, propertyType, transactionType)
+                ));
 
             return "Successfully saved customer information for " + name;
         } catch (Exception e) {

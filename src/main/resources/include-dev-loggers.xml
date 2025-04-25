@@ -9,6 +9,6 @@
      when the application runs. 
  -->
 <included>
-    <logger name="realestate" level="DEBUG"/>
+    <logger name="realestate" level="INFO"/>
     <logger name="dev.langchain4j" level="INFO"/>
 </included>

@@ -10,10 +10,6 @@ import akka.javasdk.http.HttpResponses;
 import realestate.application.ClientInfoEntity;
 import realestate.application.ProspectProcessingWorkflow;
 
-import java.util.concurrent.CompletionStage;
-
-import static java.util.Objects.requireNonNull;
-
 /**
  * This is a public API that allows to simulate the arrival of a new email.
  */
@@ -21,7 +17,7 @@ import static java.util.Objects.requireNonNull;
 @HttpEndpoint("/emails")
 public class EmailEndpoint {
 
-  private ComponentClient componentClient;
+  private final ComponentClient componentClient;
 
   public record NewEmailReq(String sender, String subject, String content) {}
 
@@ -30,22 +26,23 @@ public class EmailEndpoint {
   }
 
   @Post
-  public CompletionStage<HttpResponse> newEmail(NewEmailReq newEmailReq) {
+  public HttpResponse newEmail(NewEmailReq newEmailReq) {
     if (newEmailReq.subject == null || newEmailReq.subject.isEmpty())
       throw new IllegalArgumentException("subject cannot be empty");
     if (newEmailReq.content == null || newEmailReq.content.isEmpty())
       throw new IllegalArgumentException("content cannot be empty");
 
-    return componentClient.forWorkflow(newEmailReq.sender())
+    componentClient.forWorkflow(newEmailReq.sender())
         .method(ProspectProcessingWorkflow::processNewEmail)
-        .invokeAsync(new ProspectProcessingWorkflow.ProcessMessage(newEmailReq.sender, newEmailReq.subject(), newEmailReq.content()))
-        .thenApply(__ -> HttpResponses.accepted());
+        .invoke(new ProspectProcessingWorkflow.ProcessMessage(newEmailReq.sender, newEmailReq.subject(), newEmailReq.content()));
+
+  return HttpResponses.accepted();
   }
 
   @Get("/{id}")
-  public CompletionStage<ClientInfoEntity.ClientState> getEntity(String id) {
+  public ClientInfoEntity.ClientState getEntity(String id) {
     return componentClient.forEventSourcedEntity(id)
         .method(ClientInfoEntity::get)
-        .invokeAsync();
+        .invoke();
   }
 }

@@ -102,7 +102,24 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
             })
             .andThen(Done.class, __ -> effects().pause());
 
-    return workflow().addStep(collectingClientDetails).addStep(waitingReply).defaultStepTimeout(Duration.ofMinutes(1));
+    Step errorStep = step("error")
+        .call(() -> {
+              logger.error("Workflow for for customer [{}] failed", currentState().email());
+              return Done.done();
+            }
+        )
+        .andThen(Done.class, __ ->
+            effects()
+              .updateState(currentState().error())
+              .end());
+
+
+    return workflow()
+        .addStep(collectingClientDetails)
+        .addStep(waitingReply)
+        .addStep(errorStep)
+        .defaultStepRecoverStrategy(maxRetries(2).failoverTo("error"))
+        .defaultStepTimeout(Duration.ofMinutes(1));
   }
 
   // Commands that can ben received by workflow

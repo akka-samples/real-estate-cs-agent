@@ -2,6 +2,7 @@ package realestate.application;
 
 import akka.Done;
 import akka.javasdk.annotations.ComponentId;
+import akka.javasdk.annotations.TypeName;
 import akka.javasdk.eventsourcedentity.EventSourcedEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ public class ClientInfoEntity extends EventSourcedEntity<ClientInfoEntity.Client
   }
 
   sealed interface ClientEvent {
+    @TypeName("save-client-info")
     record SaveClientInfo(String name, String email, String phone) implements ClientEvent { }
   }
 
@@ -26,9 +28,23 @@ public class ClientInfoEntity extends EventSourcedEntity<ClientInfoEntity.Client
     };
   }
 
-
-  public record SaveInfoCmd(String name, String email, String phone) {
+  public enum TransactionType {
+    RENT,
+    BUY
   }
+
+  public record PropertyDetails(String location, String type, TransactionType transactionType) {
+    public static PropertyDetails of(String location, String type, String transactionType) {
+      var tType = switch (transactionType.toLowerCase()) {
+        case "rent" -> TransactionType.RENT;
+        case "buy" -> TransactionType.BUY;
+        default -> throw new IllegalArgumentException("Invalid transaction type: " + transactionType);
+      };
+      return new PropertyDetails(location, type, tType);
+    }
+  }
+
+  public record SaveInfoCmd(String name, String email, String phone, PropertyDetails details) { }
 
   public Effect<Done> saveClientInfo(SaveInfoCmd saveInfoCmd) {
     logger.info("Saving client info: " + saveInfoCmd);
