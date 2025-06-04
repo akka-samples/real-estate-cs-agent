@@ -12,8 +12,6 @@ import realestate.domain.ProspectState;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
-import java.util.concurrent.CompletableFuture;
 
 import static realestate.application.ProspectProcessingWorkflow.WorkflowSteps.WAITING_REPLY;
 
@@ -30,13 +28,10 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
     WAITING_REPLY
   }
 
-  private CustomerServiceAgent propertyAgentTools;
 
   public ProspectProcessingWorkflow(
-      CustomerServiceAgent propertyAgentTools,
       TimerScheduler timerScheduler,
       ComponentClient componentClient) {
-    this.propertyAgentTools = propertyAgentTools;
     this.timerScheduler = timerScheduler;
     this.componentClient = componentClient;
   }
@@ -52,16 +47,14 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
                   || currentState().status() == ProspectState.Status.WAITING_REPLY) {
                 currentState().unreadMessages().forEach(m -> logger.debug("Processing pending email: " + m));
 
-                try {
-                  var result = propertyAgentTools.processCustomerMessage(currentState().email(), currentState().pastMessages(), currentState().unreadMessages());
-                  result.toolExecutions().forEach(e -> logger.debug("Tool execution: [{}]", e));
-                  return result.content();
-                } catch (Exception e) {
-                  logger.error("Failed to extract property info", e);
-                  return e.getMessage();
-                }
+                return componentClient
+                    .forAgent()
+                    .inSession(commandContext().workflowId())
+                    .method(CustomerServiceAgent::processEmails)
+                    .invoke(new CustomerServiceAgent.ProcessEmailsCmd(currentState().unreadMessages()));
+
               } else {
-                return "unexpected status";
+                return "unexpected status " + currentState().status();
               }
             })
             .andThen(String.class, msg -> {
@@ -70,19 +63,17 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
               return switch(msg) {
                 case "WAIT_REPLY" ->
                     effects()
-                      .updateState(currentState().waitingReply().withAiMessage(msg))
+                      .updateState(currentState().waitingReply())
                       .transitionTo(WAITING_REPLY.name());
                 case "ALL_INFO_COLLECTED" -> {
                   logger.info("All info collected for client: [{}]", currentState().email());
                   yield effects()
-                      .updateState(currentState().closed().withAiMessage(msg))
+                      .updateState(currentState().closed())
                       .end();
                 }
                 default -> {
                   logger.error("Could not process message from AI: [{}]", msg);
-                  yield effects()
-                      .updateState(currentState().withAiMessage(msg))
-                      .pause();
+                  yield effects().pause();
                 }
               };
             });
