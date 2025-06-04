@@ -1,17 +1,13 @@
 import akka.javasdk.DependencyProvider;
 import akka.javasdk.ServiceSetup;
 import akka.javasdk.annotations.Setup;
-import akka.javasdk.client.ComponentClient;
 //import dev.langchain4j.model.ollama.OllamaChatModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
-import dev.langchain4j.model.openai.OpenAiChatModelName;
 import realestate.application.EmailClient;
-import realestate.domain.CustomerServiceAgent;
 
 @Setup
-public class ServiceSetupImpl implements ServiceSetup {
+public class Bootstrap implements ServiceSetup {
 
-  public ServiceSetupImpl() {
+  public Bootstrap() {
 
     // forcing OpenAI API key from environment variable
     var apiKey = System.getenv("OPENAI_API_KEY");

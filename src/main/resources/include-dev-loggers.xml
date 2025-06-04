@@ -11,5 +11,4 @@
 <included>
     <logger name="realestate" level="INFO"/>
     <logger name="dev.langchain4j" level="INFO"/>
-    <logger name="akka.javasdk" level="INFO"/>
 </included>

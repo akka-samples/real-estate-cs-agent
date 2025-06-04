@@ -27,7 +27,7 @@ public class CustomerServiceAgent extends Agent {
         this.emailClient = emailClient;
     }
 
-    private final String systemPrompt =
+    private final String SYSTEM_PROMPT =
         """
         <instructions>
         You are a customer service agent for a real estate company processing incoming emails from customers who are looking to rent or buy properties.
@@ -58,7 +58,7 @@ public class CustomerServiceAgent extends Agent {
         var unreadMsgs = cmd.emailContent.stream().map(ProspectState.Message::toString).reduce("", String::concat);
 
         return effects()
-            .systemMessage(systemPrompt)
+            .systemMessage(SYSTEM_PROMPT)
             .userMessage(unreadMsgs)
             .thenReply();
     }
