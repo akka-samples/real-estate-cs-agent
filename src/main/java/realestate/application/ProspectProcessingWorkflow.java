@@ -5,6 +5,7 @@ import akka.javasdk.annotations.ComponentId;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.timer.TimerScheduler;
 import akka.javasdk.workflow.Workflow;
+import com.typesafe.config.Config;
 import realestate.domain.CustomerServiceAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
 
   private final TimerScheduler timerScheduler;
   private final ComponentClient componentClient;
+  private final Duration followUpTimer;
 
   enum WorkflowSteps {
     COLLECTING,
@@ -31,9 +33,11 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
 
   public ProspectProcessingWorkflow(
       TimerScheduler timerScheduler,
-      ComponentClient componentClient) {
+      ComponentClient componentClient,
+      Config config) {
     this.timerScheduler = timerScheduler;
     this.componentClient = componentClient;
+    this.followUpTimer = config.getDuration("realestate.follow-up.timer");
   }
 
 
@@ -43,8 +47,8 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
     Step collectingClientDetails =
         step(WorkflowSteps.COLLECTING.name())
             .call(() -> {
-              if (currentState().status() == ProspectState.Status.COLLECT
-                  || currentState().status() == ProspectState.Status.WAITING_REPLY) {
+              if (currentState().status() != ProspectState.Status.CLOSED
+                  && currentState().status() != ProspectState.Status.ERROR) {
                 currentState().unreadMessages().forEach(m -> logger.debug("Processing pending email: " + m));
 
                 return componentClient
@@ -86,9 +90,9 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
               var timerId = "follow-up-" + commandContext().workflowId();
               timerScheduler.createSingleTimer(
                   timerId,
-                  Duration.of(1, ChronoUnit.MINUTES),
+                  followUpTimer,
                   call);
-              logger.debug("Created timer for follow up. timerId={} ", timerId);
+              logger.debug("Created timer for follow up in {}. timerId={} ", followUpTimer, timerId);
               return Done.getInstance();
             })
             .andThen(Done.class, __ -> effects().pause());
@@ -147,6 +151,10 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
         .updateState(currentState().followUpRequired())
         .pause()
         .thenReply("Follow-up email sent");
+  }
+
+  public ReadOnlyEffect<ProspectState.Status> status() {
+    return effects().reply(currentState().status());
   }
 
 }

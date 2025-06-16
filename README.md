@@ -90,14 +90,14 @@ Submit an email inquiry:
 ```shell
 curl -i -XPOST --location "http://localhost:9000/emails" \
   --header "Content-Type: application/json" \
-  --data '{"sender": "eduardo@pinto.com", "subject":"Looking to rent T2 in Porto", "content": "Hello, I am looking to rent a T2 in Porto. Can you help me?"}'
+  --data '{"sender": "john@example.com", "subject":"Looking to rent T2 in Porto", "content": "Hello, I am looking to rent a T2 in Porto. Can you help me?"}'
 ```
 
-The agent will likely decide to dollow up with an email to ask for more information (your full name, phone number, etc.). Once you provide the missing information:
+The agent will likely decide to follow up with an email to ask for more information (your full name, phone number, etc.). Once you provide the missing information:
 ```shell
 curl -i -XPOST --location "http://localhost:9000/emails" \
   --header "Content-Type: application/json" \
-  --data '{"sender": "eduardo@pinto.com", "subject":"Looking to rent T2 in Porto", "content": "My name is Eduardo pinto. My number is 911533843. Looking for an apartment."}'
+  --data '{"sender": "john@example.com", "subject":"Looking to rent T2 in Porto", "content": "My name is John Doe. My number is 911111111. Looking for an apartment."}'
 ```
 
 The process of information collection should be marked as completed and ready for human follow-up.
