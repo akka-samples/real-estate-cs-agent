@@ -10,5 +10,4 @@
  -->
 <included>
     <logger name="realestate" level="INFO"/>
-    <logger name="dev.langchain4j" level="INFO"/>
 </included>

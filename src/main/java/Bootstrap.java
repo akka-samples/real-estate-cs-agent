@@ -2,17 +2,17 @@ import akka.javasdk.DependencyProvider;
 import akka.javasdk.ServiceSetup;
 import akka.javasdk.annotations.Setup;
 //import dev.langchain4j.model.ollama.OllamaChatModel;
+import com.typesafe.config.Config;
 import realestate.application.EmailClient;
 
 @Setup
 public class Bootstrap implements ServiceSetup {
 
-  public Bootstrap() {
+  public Bootstrap(Config config) {
 
-    // forcing OpenAI API key from environment variable
-    var apiKey = System.getenv("OPENAI_API_KEY");
-    if (apiKey == null || apiKey.isEmpty())
+    if (config.getString("akka.javasdk.agent.openai.api-key").isBlank()) {
       throw new IllegalArgumentException("Requires an OpenAI API key to be set in the environment variable OPENAI_API_KEY");
+    }
 
   }
 

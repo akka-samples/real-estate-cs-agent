@@ -27,6 +27,7 @@ public class IntegrationTest extends TestKitSupport {
   @Override
   protected TestKit.Settings testKitSettings() {
     return TestKit.Settings.DEFAULT
+        .withAdditionalConfig("akka.javasdk.agent.openai.api-key = n/a")
         .withModelProvider(CustomerServiceAgent.class, testModelProvider)
         .withAdditionalConfig("realestate.follow-up.timer = 5s");
   }
@@ -37,7 +38,7 @@ public class IntegrationTest extends TestKitSupport {
     testModelProvider.reset();
   }
 
-  private void assertWorkflowStatus(String workflowId, ProspectState.Status expectedStatus) throws Exception {
+  private void assertWorkflowStatus(String workflowId, ProspectState.Status expectedStatus) {
     // Wait for workflow to transition to waiting state
     Awaitility.await()
         .atMost(Duration.ofSeconds(10))
