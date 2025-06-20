@@ -6,13 +6,11 @@ import akka.javasdk.client.ComponentClient;
 import akka.javasdk.timer.TimerScheduler;
 import akka.javasdk.workflow.Workflow;
 import com.typesafe.config.Config;
-import realestate.domain.CustomerServiceAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import realestate.domain.ProspectState;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 
 import static realestate.application.ProspectProcessingWorkflow.WorkflowSteps.WAITING_REPLY;
 

@@ -6,25 +6,19 @@ import akka.javasdk.annotations.TypeName;
 import akka.javasdk.eventsourcedentity.EventSourcedEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import realestate.domain.ClientEvent;
+import realestate.domain.ClientState;
 
 
 @ComponentId("client-info-entity")
-public class ClientInfoEntity extends EventSourcedEntity<ClientInfoEntity.ClientState, ClientInfoEntity.ClientEvent> {
+public class ClientInfoEntity extends EventSourcedEntity<ClientState, ClientEvent> {
 
   private Logger logger = LoggerFactory.getLogger(getClass());
-
-  public record ClientState(String name, String email, String phone) {
-  }
-
-  sealed interface ClientEvent {
-    @TypeName("save-client-info")
-    record SaveClientInfo(String name, String email, String phone) implements ClientEvent { }
-  }
 
   @Override
   public ClientState applyEvent(ClientEvent clientEvent) {
     return switch(clientEvent) {
-      case ClientEvent.SaveClientInfo saveClientInfo -> new ClientState(saveClientInfo.name, saveClientInfo.email, saveClientInfo.phone);
+      case ClientEvent.ClientInfoSaved saved -> new ClientState(saved.name(), saved.email(), saved.phone());
     };
   }
 
@@ -49,7 +43,7 @@ public class ClientInfoEntity extends EventSourcedEntity<ClientInfoEntity.Client
   public Effect<Done> saveClientInfo(SaveInfoCmd saveInfoCmd) {
     logger.info("Saving client info: " + saveInfoCmd);
     return effects()
-        .persist(new ClientEvent.SaveClientInfo(saveInfoCmd.name, saveInfoCmd.email, saveInfoCmd.phone))
+        .persist(new ClientEvent.ClientInfoSaved(saveInfoCmd.name, saveInfoCmd.email, saveInfoCmd.phone))
         .thenReply(__ -> Done.getInstance());
   }
 

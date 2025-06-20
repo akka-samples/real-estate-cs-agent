@@ -1,13 +1,12 @@
-package realestate.domain;
+package realestate.application;
 
 import akka.javasdk.agent.Agent;
 import akka.javasdk.annotations.ComponentId;
 import akka.javasdk.annotations.FunctionTool;
 import akka.javasdk.client.ComponentClient;
-import realestate.application.ClientInfoEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import realestate.application.EmailClient;
+import realestate.domain.ProspectState;
 
 import java.util.List;
 

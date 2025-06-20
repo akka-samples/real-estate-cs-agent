@@ -6,7 +6,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import akka.javasdk.testkit.TestKitSupport;
-import realestate.domain.CustomerServiceAgent;
+import realestate.application.CustomerServiceAgent;
 import realestate.application.ProspectProcessingWorkflow;
 import realestate.domain.ProspectState;
 
