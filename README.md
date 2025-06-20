@@ -16,47 +16,49 @@ This project illustrates an Agentic workflow for real estate customer service us
 
 This sample leverages specific Akka components:
 
-- **Workflow**: that manages the customer inquiry process from the first interaction until all the information is collected, handling the sequential steps of analyzing the inquiry, retrieving property data, and generating appropriate responses. The workflow is also used to store the sequence of emails exchanged between customer and AI.
+- **Agent**: abstracts the interaction with the LLM model and provides memory out-of-the-box for the interactions done the customer. It also provides access to 2 tools: to send customer emails and save customer information. Tool executions requested by the LLM will be automatically invoked.
+- **Workflow**: manages the customer inquiry process from the first interaction until all the information is collected, serving as a temporary storage for emails yet to be processed.
 - **EventSourced Entity**: used to maintain the customer information details, registering all the updates occurred as a sequence of events.
 - **Timers**: are used to schedule tasks that need to be executed at a later time. In this case, a timer is scheduled to send a follow-up with the client if there is no reply within a default time span. 
 - **HTTP Endpoint**: used to serve the application endpoints for receiving email inquiries (`/emails`) 
 
-### Other
-
-- **LLM model**: The agent uses an LLM model to interpret the content of the email and extract the required information. If not all the required information is provided, the agent will send a follow-up email to ask for more details. The LLM is provided with 2 tools, one to send email and another one to save customer information.
 
 ### Typical flow
 
-The following diagram illustrates the typical interaction flow of the Real Estate Customer Service Agent:
+The following diagram illustrates the typical interaction flow of the Real Estate Customer Service Agent and the way the different Akka Components interact:
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant HTTPEndpoint as HTTP Endpoint
-    participant Workflow as Akka Workflow
-    participant LLM as LLM Model
+    participant Workflow as Workflow
+    participant Agent as Agent
     participant Entity as EventSourced Entity
-    participant Timer as Akka Timers
+    participant Timer as Timers
 
     Client->>HTTPEndpoint: Send initial inquiry email
     HTTPEndpoint->>Workflow: Create new workflow instance
     Note over Workflow: Initialize customer inquiry process
 
-    Workflow->>LLM: Analyze email content
+    Workflow->>Agent: Process email content
+    Agent->>Agent: Analyze with AI model
 
     alt Information incomplete
-        LLM->>Client: Send follow-up email (using email tool)
-        LLM-->>Workflow: Return WAIT_REPLY status
+        Agent->>Client: Send follow-up email (using tool)
+        Agent-->>Workflow: Return WAIT_REPLY status
         Workflow->>Timer: Schedule follow-up reminder
         Note over Workflow: Wait for response
-        
+
         Client->>HTTPEndpoint: Send email with additional information
         HTTPEndpoint->>Workflow: Forward to existing workflow
         Workflow->>Timer: Cancel reminder
-        Workflow->>LLM: Analyze updated information
+        Workflow->>Agent: Process updated email
+        Agent->>Agent: Analyze updated information
     else All information collected
-        LLM->>Entity: Save customer information (using save tool)
-        LLM-->>Workflow: Return ALL_INFO_COLLECTED status
+        Agent->>Entity: Save customer information (using tool)
+        Entity->>Entity: Persist customer data as events
+        Entity-->>Agent: Confirmation
+        Agent-->>Workflow: Return ALL_INFO_COLLECTED status
         Note over Workflow: Mark inquiry as complete
     end
 ```
@@ -90,14 +92,14 @@ Submit an email inquiry:
 ```shell
 curl -i -XPOST --location "http://localhost:9000/emails" \
   --header "Content-Type: application/json" \
-  --data '{"sender": "eduardo@pinto.com", "subject":"Looking to rent T2 in Porto", "content": "Hello, I am looking to rent a T2 in Porto. Can you help me?"}'
+  --data '{"sender": "john@example.com", "subject":"Looking to rent T2 in Porto", "content": "Hello, I am looking to rent a T2 in Porto. Can you help me?"}'
 ```
 
-The agent will likely decide to dollow up with an email to ask for more information (your full name, phone number, etc.). Once you provide the missing information:
+The agent will likely decide to follow up with an email to ask for more information (your full name, phone number, etc.). Once you provide the missing information:
 ```shell
 curl -i -XPOST --location "http://localhost:9000/emails" \
   --header "Content-Type: application/json" \
-  --data '{"sender": "eduardo@pinto.com", "subject":"Looking to rent T2 in Porto", "content": "My name is Eduardo pinto. My number is 911533843. Looking for an apartment."}'
+  --data '{"sender": "john@example.com", "subject":"Looking to rent T2 in Porto", "content": "My name is John Doe. My number is 911111111. Looking for an apartment."}'
 ```
 
 The process of information collection should be marked as completed and ready for human follow-up.
@@ -105,15 +107,30 @@ The process of information collection should be marked as completed and ready fo
 
 ## Deployment
 
-You can use the [Akka Console](https://console.akka.io) to create a project and deploy this service.
+You can use the [Akka Console](https://console.akka.io) to create a project and deploy this service. Once you have a project created, follow these steps.
+
+#### Build docker image 
 
 ```shell
-# Build container image
 mvn clean install -DskipTests
-
-# Deploy using Akka CLI
-akka service deploy real-estate-cs-agent real-estate-cs-agent:tag-name --push
 ```
+
+#### Setup OpenAI API key
+```shell
+akka secret create generic openai-api --literal key=$OPENAI_API_KEY
+```
+
+NOTE: this assumes you have your `$OPENAI_API_KEY` exported as required to run the project, otherwise just pass the value directly.
+
+#### Push image and deploy the service
+
+```shell
+akka service deploy real-estate-cs-agent real-estate-cs-agent:<tag-name> \
+  --secret-env OPENAI_API_KEY=openai-api/key --push
+```
+
+NOTE: the value of OPENAI_API_KEY is set to secret-name/key-name, as defined in the previous command: secret-name=openai-api and key-name=key.
+
 
 For more information on deployment, refer to [Deploy and manage services](https://doc.akka.io/operations/services/deploy-service.html).
 

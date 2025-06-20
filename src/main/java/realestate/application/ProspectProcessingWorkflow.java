@@ -5,15 +5,12 @@ import akka.javasdk.annotations.ComponentId;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.timer.TimerScheduler;
 import akka.javasdk.workflow.Workflow;
-import realestate.domain.CustomerServiceAgent;
+import com.typesafe.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import realestate.domain.ProspectState;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
-import java.util.concurrent.CompletableFuture;
 
 import static realestate.application.ProspectProcessingWorkflow.WorkflowSteps.WAITING_REPLY;
 
@@ -24,21 +21,21 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
 
   private final TimerScheduler timerScheduler;
   private final ComponentClient componentClient;
+  private final Duration followUpTimer;
 
   enum WorkflowSteps {
     COLLECTING,
     WAITING_REPLY
   }
 
-  private CustomerServiceAgent propertyAgentTools;
 
   public ProspectProcessingWorkflow(
-      CustomerServiceAgent propertyAgentTools,
       TimerScheduler timerScheduler,
-      ComponentClient componentClient) {
-    this.propertyAgentTools = propertyAgentTools;
+      ComponentClient componentClient,
+      Config config) {
     this.timerScheduler = timerScheduler;
     this.componentClient = componentClient;
+    this.followUpTimer = config.getDuration("realestate.follow-up.timer");
   }
 
 
@@ -48,20 +45,18 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
     Step collectingClientDetails =
         step(WorkflowSteps.COLLECTING.name())
             .call(() -> {
-              if (currentState().status() == ProspectState.Status.COLLECT
-                  || currentState().status() == ProspectState.Status.WAITING_REPLY) {
+              if (currentState().status() != ProspectState.Status.CLOSED
+                  && currentState().status() != ProspectState.Status.ERROR) {
                 currentState().unreadMessages().forEach(m -> logger.debug("Processing pending email: " + m));
 
-                try {
-                  var result = propertyAgentTools.processCustomerMessage(currentState().email(), currentState().pastMessages(), currentState().unreadMessages());
-                  result.toolExecutions().forEach(e -> logger.debug("Tool execution: [{}]", e));
-                  return result.content();
-                } catch (Exception e) {
-                  logger.error("Failed to extract property info", e);
-                  return e.getMessage();
-                }
+                return componentClient
+                    .forAgent()
+                    .inSession(commandContext().workflowId())
+                    .method(CustomerServiceAgent::processEmails)
+                    .invoke(new CustomerServiceAgent.ProcessEmailsCmd(currentState().unreadMessages()));
+
               } else {
-                return "unexpected status";
+                return "unexpected status " + currentState().status();
               }
             })
             .andThen(String.class, msg -> {
@@ -70,19 +65,17 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
               return switch(msg) {
                 case "WAIT_REPLY" ->
                     effects()
-                      .updateState(currentState().waitingReply().withAiMessage(msg))
+                      .updateState(currentState().waitingReply())
                       .transitionTo(WAITING_REPLY.name());
                 case "ALL_INFO_COLLECTED" -> {
                   logger.info("All info collected for client: [{}]", currentState().email());
                   yield effects()
-                      .updateState(currentState().closed().withAiMessage(msg))
+                      .updateState(currentState().closed())
                       .end();
                 }
                 default -> {
                   logger.error("Could not process message from AI: [{}]", msg);
-                  yield effects()
-                      .updateState(currentState().withAiMessage(msg))
-                      .pause();
+                  yield effects().pause();
                 }
               };
             });
@@ -95,9 +88,9 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
               var timerId = "follow-up-" + commandContext().workflowId();
               timerScheduler.createSingleTimer(
                   timerId,
-                  Duration.of(1, ChronoUnit.MINUTES),
+                  followUpTimer,
                   call);
-              logger.debug("Created timer for follow up. timerId={} ", timerId);
+              logger.debug("Created timer for follow up in {}. timerId={} ", followUpTimer, timerId);
               return Done.getInstance();
             })
             .andThen(Done.class, __ -> effects().pause());
@@ -156,6 +149,10 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
         .updateState(currentState().followUpRequired())
         .pause()
         .thenReply("Follow-up email sent");
+  }
+
+  public ReadOnlyEffect<ProspectState.Status> status() {
+    return effects().reply(currentState().status());
   }
 
 }

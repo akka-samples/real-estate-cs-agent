@@ -9,6 +9,7 @@ import akka.javasdk.client.ComponentClient;
 import akka.javasdk.http.HttpResponses;
 import realestate.application.ClientInfoEntity;
 import realestate.application.ProspectProcessingWorkflow;
+import realestate.domain.ClientState;
 
 /**
  * This is a public API that allows to simulate the arrival of a new email.
@@ -40,7 +41,7 @@ public class EmailEndpoint {
   }
 
   @Get("/{id}")
-  public ClientInfoEntity.ClientState getEntity(String id) {
+  public ClientState getEntity(String id) {
     return componentClient.forEventSourcedEntity(id)
         .method(ClientInfoEntity::get)
         .invoke();
