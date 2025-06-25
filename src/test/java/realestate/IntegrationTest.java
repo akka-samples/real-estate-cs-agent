@@ -58,13 +58,11 @@ public class IntegrationTest extends TestKitSupport {
   @Test
   public void shouldCompleteInquiryWhenAllInformationProvidedInFirstEmail() throws Exception {
     // Given: Mock LLM response indicating all information is collected - match XML format
-    testModelProvider.mockResponse(
-        message -> message.contains("complete@inquiry.com"),
-        "ALL_INFO_COLLECTED"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains("complete@inquiry.com"))
+        .reply("ALL_INFO_COLLECTED");
 
     String customerEmail = "complete@inquiry.com";
-    String workflowId = customerEmail;
 
     // When: Process a complete email with all required information
     var processMessageCmd = new ProspectProcessingWorkflow.ProcessMessage(
@@ -74,7 +72,7 @@ public class IntegrationTest extends TestKitSupport {
     );
 
     var response = componentClient
-        .forWorkflow(workflowId)
+        .forWorkflow(customerEmail)
         .method(ProspectProcessingWorkflow::processNewEmail)
         .invokeAsync(processMessageCmd)
         .toCompletableFuture()
@@ -83,17 +81,16 @@ public class IntegrationTest extends TestKitSupport {
     // Then: Workflow should start processing
     assertEquals("Processing started", response);
 
-    assertWorkflowStatus(workflowId, CLOSED);
+    assertWorkflowStatus(customerEmail, CLOSED);
   }
 
   @Test
   public void shouldRequestFollowUpWhenInformationIncomplete() throws Exception {
     String customerEmail = "follow@up.com";
     // Given: Mock LLM response indicating more information is needed - match XML format
-    testModelProvider.mockResponse(
-        message -> message.contains(customerEmail),
-        "WAIT_REPLY"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains(customerEmail))
+        .reply("WAIT_REPLY");
 
     // When: Process an incomplete email
     var processMessageCmd = new ProspectProcessingWorkflow.ProcessMessage(
@@ -115,10 +112,9 @@ public class IntegrationTest extends TestKitSupport {
   public void shouldCompleteAfterCustomerProvidesAdditionalInformation() throws Exception {
     // Given: First incomplete inquiry - match the XML format that Message.toString() produces
     var customerEmail = "john@doe.com";
-    testModelProvider.mockResponse(
-        message -> message.contains("john@doe.com") & !message.contains("123456789"),
-        "WAIT_REPLY"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains("john@doe.com") & !message.contains("123456789"))
+        .reply("WAIT_REPLY");
 
     // Process initial incomplete email
     var initialMessage = new ProspectProcessingWorkflow.ProcessMessage(
@@ -135,10 +131,9 @@ public class IntegrationTest extends TestKitSupport {
     assertWorkflowStatus(customerEmail, WAITING_REPLY);
 
     // Given: Mock response for complete information - match the XML format for follow-up message
-    testModelProvider.mockResponse(
-        message -> message.contains(customerEmail) && message.contains("123456789"),
-        "ALL_INFO_COLLECTED"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains(customerEmail) && message.contains("123456789"))
+        .reply("ALL_INFO_COLLECTED");
 
     // When: Customer provides additional information
     var followUpMessage = new ProspectProcessingWorkflow.ProcessMessage(
@@ -163,10 +158,9 @@ public class IntegrationTest extends TestKitSupport {
     var customerEmail = "timeout@test.com";
 
     // Given: Mock LLM response indicating wait for reply - match XML format
-    testModelProvider.mockResponse(
-        message -> message.contains(customerEmail),
-        "WAIT_REPLY"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains(customerEmail))
+        .reply("WAIT_REPLY");
 
     // When: Process email that requires follow-up
     var processMessageCmd = new ProspectProcessingWorkflow.ProcessMessage(
@@ -189,12 +183,11 @@ public class IntegrationTest extends TestKitSupport {
   @Test
   public void shouldHandleErrorScenarios() throws Exception {
     // Given: Mock LLM response that causes an error - match XML format
-    testModelProvider.mockError(
-        message -> message.contains("error@test.com"),
-        new RuntimeException("Simulated error"));
+    testModelProvider
+        .whenMessage(message -> message.contains("error@test.com"))
+        .failWith(new RuntimeException("Simulated error"));
 
     String customerEmail = "error@test.com";
-    String workflowId = customerEmail;
 
     // When: Process email that will cause an error
     var processMessageCmd = new ProspectProcessingWorkflow.ProcessMessage(
@@ -204,13 +197,13 @@ public class IntegrationTest extends TestKitSupport {
     );
 
     var response = componentClient
-        .forWorkflow(workflowId)
+        .forWorkflow(customerEmail)
         .method(ProspectProcessingWorkflow::processNewEmail)
         .invoke(processMessageCmd);
 
     assertEquals("Processing started", response);
 
-    assertWorkflowStatus(workflowId, ERROR);
+    assertWorkflowStatus(customerEmail, ERROR);
   }
 
 
@@ -220,15 +213,13 @@ public class IntegrationTest extends TestKitSupport {
     var customer2 = "customer2@test.com";
 
     // Given: Different responses for different customers - match XML format
-    testModelProvider.mockResponse(
-        message -> message.contains(customer1) && message.contains("111-1111"),
-        "ALL_INFO_COLLECTED"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains(customer1) && message.contains("111-1111"))
+        .reply("ALL_INFO_COLLECTED");
 
-    testModelProvider.mockResponse(
-        message -> message.contains(customer2),
-        "WAIT_REPLY"
-    );
+    testModelProvider
+        .whenMessage(message -> message.contains(customer2))
+        .reply("WAIT_REPLY");
 
     // When: Process emails from multiple customers
     var customer1Message = new ProspectProcessingWorkflow.ProcessMessage(
