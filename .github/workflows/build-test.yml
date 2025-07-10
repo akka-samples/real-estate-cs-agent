@@ -45,4 +45,4 @@ jobs:
 
       - name: mvn test
         run: |-
-          mvn test --no-transfer-progress
+          mvn -s .github/settings.xml test --no-transfer-progress
