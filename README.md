@@ -78,6 +78,8 @@ To run the sample, you need to provide an OpenAI API key and provide it as an en
 export OPENAI_API_KEY=your-openai-api-key
 ```
 
+Or change the `application.conf` file to use a different model provider.
+
 Build and run the application:
 ```shell
 # Run the application
