@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Dummy email client for demonstrations purpose
+ * Dummy email client for demonstration purpose
  */
 public class EmailClient {
 

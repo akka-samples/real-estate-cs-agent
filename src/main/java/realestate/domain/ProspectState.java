@@ -47,6 +47,9 @@ public record ProspectState(Status status, String email, List<Message> unreadMes
     this(status, email, unreadMessages, lastUpdated, Optional.empty());
   }
 
+  public boolean isWaitingReply() {
+    return status == Status.WAITING_REPLY;
+  }
 
   public ProspectState waitingReply() {
     return new ProspectState(Status.WAITING_REPLY, email, unreadMessages, System.currentTimeMillis());
