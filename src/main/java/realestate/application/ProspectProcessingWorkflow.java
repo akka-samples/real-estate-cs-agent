@@ -1,18 +1,15 @@
 package realestate.application;
 
-import akka.Done;
+
 import akka.javasdk.annotations.ComponentId;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.timer.TimerScheduler;
 import akka.javasdk.workflow.Workflow;
 import com.typesafe.config.Config;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import realestate.domain.ProspectState;
-
-import java.time.Duration;
-
-import static realestate.application.ProspectProcessingWorkflow.WorkflowSteps.WAITING_REPLY;
 
 @ComponentId("prospect-processing-workflow")
 public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
@@ -22,11 +19,6 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
   private final TimerScheduler timerScheduler;
   private final ComponentClient componentClient;
   private final Duration followUpTimer;
-
-  enum WorkflowSteps {
-    COLLECTING,
-    WAITING_REPLY
-  }
 
 
   public ProspectProcessingWorkflow(
@@ -39,80 +31,74 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
   }
 
 
+
   @Override
-  public WorkflowDef<ProspectState> definition() {
+  public WorkflowSettings settings() {
+    return WorkflowSettings.builder()
+      .defaultStepTimeout(Duration.ofMinutes(1 ))
+      .defaultStepRecovery(maxRetries(2).failoverTo(ProspectProcessingWorkflow::errorStep))
+      .build();
+  }
 
-    Step collectingClientDetails =
-        step(WorkflowSteps.COLLECTING.name())
-            .call(() -> {
-              if (currentState().status() != ProspectState.Status.CLOSED
-                  && currentState().status() != ProspectState.Status.ERROR) {
-                currentState().unreadMessages().forEach(m -> logger.debug("Processing pending email: " + m));
+  private StepEffect collectingClientDetails() {
 
-                return componentClient
-                    .forAgent()
-                    .inSession(commandContext().workflowId())
-                    .method(CustomerServiceAgent::processEmails)
-                    .invoke(new CustomerServiceAgent.ProcessEmailsCmd(currentState().unreadMessages()));
+    String msg;
 
-              } else {
-                return "unexpected status " + currentState().status();
-              }
-            })
-            .andThen(String.class, msg -> {
-              logger.debug("Current status: [{}], processing from AI: [{}]", currentState().status(), msg);
+    if (currentState().status() != ProspectState.Status.CLOSED
+        && currentState().status() != ProspectState.Status.ERROR) {
 
-              return switch(msg) {
-                case "WAIT_REPLY" ->
-                    effects()
-                      .updateState(currentState().waitingReply())
-                      .transitionTo(WAITING_REPLY.name());
-                case "ALL_INFO_COLLECTED" -> {
-                  logger.info("All info collected for client: [{}]", currentState().email());
-                  yield effects()
-                      .updateState(currentState().closed())
-                      .end();
-                }
-                default -> {
-                  logger.error("Could not process message from AI: [{}]", msg);
-                  yield effects().pause();
-                }
-              };
-            });
+      currentState().unreadMessages().forEach(m -> logger.debug("Processing pending email: {}", m));
+      msg =
+          componentClient
+              .forAgent()
+              .inSession(commandContext().workflowId())
+              .method(CustomerServiceAgent::processEmails)
+              .invoke(new CustomerServiceAgent.ProcessEmailsCmd(currentState().unreadMessages()));
+    } else {
+      msg = "unexpected status " + currentState().status();
+    }
 
-    Step waitingReply =
-        step(WAITING_REPLY.name())
-            .call(() -> {
-              // schedule follow-up email after 1 minute
-              var call = componentClient.forWorkflow(commandContext().workflowId()).method(ProspectProcessingWorkflow::followUp).deferred();
-              var timerId = "follow-up-" + commandContext().workflowId();
-              timerScheduler.createSingleTimer(
-                  timerId,
-                  followUpTimer,
-                  call);
-              logger.debug("Created timer for follow up in {}. timerId={} ", followUpTimer, timerId);
-              return Done.getInstance();
-            })
-            .andThen(Done.class, __ -> effects().pause());
+    logger.debug("Current status: [{}], processing from AI: [{}]", currentState().status(), msg);
 
-    Step errorStep = step("error")
-        .call(() -> {
-              logger.error("Workflow for for customer [{}] failed", currentState().email());
-              return Done.done();
-            }
-        )
-        .andThen(Done.class, __ ->
-            effects()
-              .updateState(currentState().error())
-              .end());
+    return switch(msg) {
+      case "WAIT_REPLY" ->
+        stepEffects()
+          .updateState(currentState().waitingReply())
+          .thenTransitionTo(ProspectProcessingWorkflow::waitingReply);
 
+      case "ALL_INFO_COLLECTED" -> {
+        logger.info("All info collected for client: [{}]", currentState().email());
+        yield stepEffects()
+          .updateState(currentState().closed())
+          .thenEnd();
+      }
+      default -> {
+        logger.error("Could not process message from AI: [{}]", msg);
+        yield stepEffects().thenPause();
+      }
+    };
+  }
 
-    return workflow()
-        .addStep(collectingClientDetails)
-        .addStep(waitingReply)
-        .addStep(errorStep)
-        .defaultStepRecoverStrategy(maxRetries(2).failoverTo("error"))
-        .defaultStepTimeout(Duration.ofMinutes(1));
+  private StepEffect waitingReply() {
+    var call =
+      componentClient
+        .forWorkflow(commandContext().workflowId())
+        .method(ProspectProcessingWorkflow::followUp).deferred();
+
+    var timerId = "follow-up-" + commandContext().workflowId();
+
+    timerScheduler.createSingleTimer(
+      timerId,
+      followUpTimer,
+      call);
+    logger.debug("Created timer for follow up in {}. timerId={} ", followUpTimer, timerId);
+
+    return stepEffects().thenPause();
+  }
+
+  private StepEffect errorStep() {
+    logger.error("Workflow for for customer [{}] failed", currentState().email());
+    return stepEffects().updateState(currentState().error()).thenEnd();
   }
 
   // Commands that can ben received by workflow
@@ -129,18 +115,18 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
         ? ProspectState.EMPTY.withEmail(msg.sender()).addUnreadMessage(newMsg)
         : currentState().addUnreadMessage(newMsg);
 
-    // delete existing timer if it exists since we have a reply now
+    // delete the existing timer if it exists since we have a reply now
     if (currentState() != null)
       timerScheduler.delete("follow-up-" + currentState().email());
 
     return effects()
         .updateState(updatedState)
-        .transitionTo(WorkflowSteps.COLLECTING.name())
+        .transitionTo(ProspectProcessingWorkflow::collectingClientDetails)
         .thenReply("Processing started");
   }
 
   public Effect<String> followUp() {
-    if (currentState() == null || currentState().status() != ProspectState.Status.WAITING_REPLY) {
+    if (currentState() == null || currentState().isWaitingReply()) {
       return effects().pause().thenReply("No pending email to follow up");
     }
 
