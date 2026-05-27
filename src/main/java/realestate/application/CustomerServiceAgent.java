@@ -1,7 +1,7 @@
 package realestate.application;
 
 import akka.javasdk.agent.Agent;
-import akka.javasdk.annotations.ComponentId;
+import akka.javasdk.annotations.Component;
 import akka.javasdk.annotations.FunctionTool;
 import akka.javasdk.client.ComponentClient;
 import org.slf4j.Logger;
@@ -12,7 +12,7 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-@ComponentId("customer-service-agent")
+@Component(id = "customer-service-agent")
 public class CustomerServiceAgent extends Agent {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());

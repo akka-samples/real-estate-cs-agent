@@ -1,7 +1,7 @@
 package realestate.application;
 
 
-import akka.javasdk.annotations.ComponentId;
+import akka.javasdk.annotations.Component;
 import akka.javasdk.client.ComponentClient;
 import akka.javasdk.timer.TimerScheduler;
 import akka.javasdk.workflow.Workflow;
@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import realestate.domain.ProspectState;
 
-@ComponentId("prospect-processing-workflow")
+@Component(id = "prospect-processing-workflow")
 public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -36,7 +36,7 @@ public class ProspectProcessingWorkflow extends Workflow<ProspectState> {
   public WorkflowSettings settings() {
     return WorkflowSettings.builder()
       .defaultStepTimeout(Duration.ofMinutes(1 ))
-      .defaultStepRecovery(maxRetries(2).failoverTo(ProspectProcessingWorkflow::errorStep))
+      .defaultStepRecovery(RecoverStrategy.maxRetries(2).failoverTo(ProspectProcessingWorkflow::errorStep))
       .build();
   }
 
