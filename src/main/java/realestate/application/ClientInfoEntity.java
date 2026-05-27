@@ -1,7 +1,7 @@
 package realestate.application;
 
 import akka.Done;
-import akka.javasdk.annotations.ComponentId;
+import akka.javasdk.annotations.Component;
 import akka.javasdk.annotations.TypeName;
 import akka.javasdk.eventsourcedentity.EventSourcedEntity;
 import org.slf4j.Logger;
@@ -10,7 +10,7 @@ import realestate.domain.ClientEvent;
 import realestate.domain.ClientState;
 
 
-@ComponentId("client-info-entity")
+@Component(id = "client-info-entity")
 public class ClientInfoEntity extends EventSourcedEntity<ClientState, ClientEvent> {
 
   private Logger logger = LoggerFactory.getLogger(getClass());
